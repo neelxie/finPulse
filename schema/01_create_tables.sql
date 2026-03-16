@@ -27,3 +27,4 @@ CREATE TABLE transactions (
 
 CREATE INDEX idx_txn_date     ON transactions(txn_date);
 CREATE INDEX idx_txn_account  ON transactions(account_id);
+CREATE INDEX idx_txn_date_account ON transactions (account_id, txn_date);

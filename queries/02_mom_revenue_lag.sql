@@ -4,27 +4,35 @@
 -- ============================================================
 --
 -- Business question:
---   How is revenue trending month by month?
---   Which months showed decline and by how much?
+--   How is revenue trending month by month? Which months
+--   showed a decline, by how much, and is the business
+--   accelerating or decelerating over time?
+--   This is the foundational metric in any finance dashboard.
 --
 -- Approach:
---   Aggregate revenue by month with DATE_TRUNC, then apply
---   LAG() window function to compare each month to the prior.
---   NULLIF on the denominator prevents division-by-zero on
---   the first month row.
+--   Step 1 — aggregate raw transactions to monthly revenue
+--   using DATE_TRUNC('month') inside a CTE. This isolates
+--   the aggregation logic cleanly before the window layer.
+--   Step 2 — apply LAG(revenue, 1) in the outer query to
+--   compare each month to the one immediately before it.
+--   NULLIF on the LAG value prevents division-by-zero if a
+--   prior month had zero revenue (e.g. first month of data).
 --
 -- Tradeoff considered:
---   Could use a self-join on the aggregated CTE instead of LAG,
---   but LAG is cleaner, more readable, and avoids the extra join.
+--   Alternative: self-join the CTE on month - interval '1 month'.
+--   Rejected because LAG is cleaner, avoids an extra JOIN, and
+--   correctly handles gaps in months (where a self-join on exact
+--   date arithmetic would return NULL silently without warning).
+--   LAG makes the intent explicit and readable.
 --
 -- Expected output columns:
---   month, revenue, prev_revenue, pct_change
+--   month, revenue, prev_month_revenue, abs_change, pct_change
 -- ============================================================
 
-WITH monthly AS (
+WITH monthly_revenue AS (
   SELECT
-    DATE_TRUNC('month', t.txn_date) AS month,
-    SUM(t.amount)                   AS revenue
+    DATE_TRUNC('month', t.txn_date)::DATE  AS month,
+    SUM(t.amount)                           AS revenue
   FROM transactions t
   JOIN accounts a USING (account_id)
   WHERE a.account_type = 'revenue'
@@ -33,10 +41,16 @@ WITH monthly AS (
 SELECT
   month,
   revenue,
-  LAG(revenue) OVER (ORDER BY month) AS prev_revenue,
+  LAG(revenue, 1) OVER (ORDER BY month)                             AS prev_month_revenue,
+
+  -- Absolute change: positive = growth, negative = decline
+  revenue - LAG(revenue, 1) OVER (ORDER BY month)                   AS abs_change,
+
+  -- Percentage change: NULLIF guards against division by zero on first row
   ROUND(
-    (revenue - LAG(revenue) OVER (ORDER BY month))
-    / NULLIF(LAG(revenue) OVER (ORDER BY month), 0) * 100
-  , 1) AS pct_change
-FROM monthly
+    (revenue - LAG(revenue, 1) OVER (ORDER BY month))
+    / NULLIF(LAG(revenue, 1) OVER (ORDER BY month), 0) * 100
+  , 1)                                                               AS pct_change
+
+FROM monthly_revenue
 ORDER BY month;
