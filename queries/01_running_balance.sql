@@ -1,0 +1,17 @@
+-- ============================================================
+-- Query: [short title]
+-- File: queries/0X_filename.sql
+-- ============================================================
+--
+-- Business question:
+--   [Plain English — what does a finance team want to know?]
+--
+-- Approach:
+--   [Why did you write it this way? What technique and why?]
+--
+-- Tradeoff considered:
+--   [What did you NOT do, and why? e.g. "subquery vs CTE"]
+--
+-- Expected output columns:
+--   [list them]
+-- ============================================================
